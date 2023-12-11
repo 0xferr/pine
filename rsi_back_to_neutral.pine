@@ -1,0 +1,67 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ferradura
+
+//@version=5
+indicator("RSI correction", "RSI corr")
+
+// Input
+rsiLength = input.int(defval = 14, step = 1, title = "RSI Length", group = "RSI")
+fastLength = input.int(defval = 10, step = 1, title = "Fast MA", group = "RSI")
+slowLength = input.int(defval = 50, step = 1, title = "Slow MA", group = "RSI")
+lookback = input.int(defval = 30, step = 1, title = "lookback period", group = "Signal")
+rsiHigh = input.int(defval = 70, minval = 51, maxval = 100, step = 1, title = "RSI Overbought", group = "Signal")
+rsiLow = input.int(defval = 30, minval = 0, maxval = 49, step = 1, title = "RSI Oversold", group = "Signal")
+neutralZoneLow = input.int(defval = 45, minval = 31, maxval = 69, step = 1, title = "Neutral zone low", group = "Signal")
+neutralZoneHigh = input.int(defval = 55, minval = 31, maxval = 69, step = 1, title = "Neutral zone high", group = "Signal")
+lookbackCorrectionRight = input.int(defval = 3, step = 1, title = "local lookback period right", group = "Signal")
+lookbackCorrectionLeft = input.int(defval = 3, step = 1, title = "local lookback period left", group = "Signal")
+
+
+// Calculations
+rsiCurve = ta.rsi(close, rsiLength)
+rsiFastMA = ta.sma(rsiCurve, fastLength)
+rsiSlowMA = ta.sma(rsiCurve, slowLength)
+
+pivotHigh = ta.highest(rsiCurve, lookback)
+pivotLow = ta.lowest(rsiCurve, lookback)
+
+localRsiLow = ta.lowest(rsiCurve, lookbackCorrectionLeft)
+localRsiHigh = ta.highest(rsiCurve, lookbackCorrectionLeft)
+
+// Signal
+maInNeutralZone = rsiFastMA >= neutralZoneLow and rsiFastMA <= neutralZoneHigh
+rsiAboveNeutralLow = rsiCurve >= neutralZoneLow
+rsiBelowNeutralHigh = rsiCurve <= neutralZoneHigh
+rsiOverbought = pivotHigh >= rsiHigh
+rsiOversold = pivotLow <= rsiLow
+currentIsLowest = rsiCurve == localRsiLow
+currentIsHighest = rsiCurve == localRsiHigh
+
+longRule = rsiOverbought and rsiBelowNeutralHigh and maInNeutralZone and currentIsLowest
+
+bgcolor(color = longRule ? color.rgb(212, 255, 197) : na)
+longSig = longRule ? rsiCurve : na
+plotshape(longSig, title = "Long", style = shape.triangleup, location = location.bottom, color = color.green, size = size.normal)
+
+
+
+
+// Plot Indicator
+rsiPlot = plot(rsiCurve, "RSI", color = color.purple)
+plot(rsiFastMA, "FastMA(rsi)", color = color.blue)
+plot(rsiSlowMA, "SlowMA(rsi)", color = color.orange)
+
+// Plot Zones
+rsiUpperBand = hline(rsiHigh, "RSI Upper Band", color=#787B86)
+midline = hline(50, "RSI Middle Band", color=color.new(#787B86, 50))
+rsiLowerBand = hline(rsiLow, "RSI Lower Band", color=#787B86)
+// fill(rsiUpperBand, rsiLowerBand, color=color.rgb(126, 87, 194, 90), title="RSI Background Fill")
+
+midLinePlot = plot(50, color = na, editable = false, display = display.none)
+fill(rsiPlot, midLinePlot, 100, rsiHigh, top_color = color.new(color.green, 0), bottom_color = color.new(color.green, 100),  title = "Overbought Gradient Fill")
+fill(rsiPlot, midLinePlot, rsiLow,  0,  top_color = color.new(color.red, 100), bottom_color = color.new(color.red, 0),      title = "Oversold Gradient Fill")
+
+
+
+
+

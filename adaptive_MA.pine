@@ -1,0 +1,185 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Siarhei Keulich @ferradura
+
+//@version=5
+indicator(title="Adaptive Multi-TimeFrame MA", shorttitle="MA", overlay=true)
+import PineCoders/VisibleChart/4 as vc
+
+// Constants
+GROUP1 = "Current TF MA                                  Custom TF MA"
+GROUP2 = "Day TF MA                                      Week TF MA"
+CURRENT = "Current "
+CUSTOM = "Custom "
+DAY = "Day "
+WEEK = "    Week "
+COLOR1 = color.orange
+COLOR2 = color.green
+COLOR3 = color.black
+COLOR4 = color.navy
+CURRENT_LINE_WIDTH = 1
+CUSTOM_LINE_WIDTH = 1
+DAY_LINE_WIDTH = 2
+WEEK_LINE_WIDTH = 3
+PLOT_STYLE = plot.style_linebr
+LABEL_STYLE = label.style_none
+
+//      INPUTS 
+ma_type = input.string(defval = "SMA", options = ["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], title = "MA type",  inline = "1st")
+src = input.source(defval = close, title = "source", inline = "1st")
+hideIfOutOfRange = input.bool(defval = true, title = "Hide MA out of", tooltip = "Hide MA value is greater or less than than min and max for last X bars", inline = "2nd", display = display.data_window) 
+range_perc = input.int(defval = 20, title = "Range %", minval = 0  , maxval =1000  , step = 5, inline = "2nd", display = display.data_window) 
+//GROUP1 - Current timeframe and CustomTF 
+in_show_all_native = input.bool(defval = true, title = "Show MA for current TF           ", inline = "c0", group = GROUP1) 
+in_show_all_cust = input.bool(defval = false, title = "Show custom", inline = "c0", group = GROUP1) 
+customTF = input.timeframe(defval = "60", title = "TF", inline = "c0", group =  GROUP1, display = display.data_window) 
+//GROUP1 Left - Currrent
+in_show_n1 = input.bool(defval = true, title = "", inline = "c1", group = GROUP1) 
+in_color_n1 = input.color(COLOR1, title = "", inline = "c1", group = GROUP1)
+in_len_n1 = input.int(20, title = CURRENT+"1", group = GROUP1, inline = "c1", display = display.data_window) 
+in_show_n2 = input.bool(defval = true, title = "", inline = "c2", group = GROUP1) 
+in_color_n2 = input.color(COLOR2, title = "", inline = "c2", group = GROUP1)
+in_len_n2 = input.int(50, title = CURRENT+"2", group = GROUP1, inline = "c2", display = display.data_window) 
+in_show_n3 = input.bool(defval = true, title = "", inline = "c3", group = GROUP1) 
+in_color_n3 = input.color(COLOR3, title = "", inline = "c3", group = GROUP1)
+in_len_n3 = input.int(100, title = CURRENT+"3", group = GROUP1, inline = "c3", display = display.data_window) 
+in_show_n4 = input.bool(defval = true, title = "", inline = "c4", group = GROUP1) 
+in_color_n4 = input.color(COLOR4, title = "", inline = "c4", group = GROUP1)
+in_len_n4 = input.int(200, title = CURRENT+"4", group = GROUP1, inline = "c4", display = display.data_window) 
+//GROUP1 Right - Custom
+in_len_c1 = input.int(20, title = CUSTOM+"1", group = GROUP1, inline = "c1", display = display.data_window) 
+in_color_c1 = input.color(COLOR1, title = "", inline = "c1", group = GROUP1)
+in_show_c1 = input.bool(defval = true, title = "", inline = "c1", group = GROUP1) 
+in_len_c2 = input.int(50, title = CUSTOM+"2", group = GROUP1, inline = "c2", display = display.data_window) 
+in_color_c2 = input.color(COLOR2, title = "", inline = "c2", group = GROUP1)
+in_show_c2 = input.bool(defval = true, title = "", inline = "c2", group = GROUP1) 
+in_len_c3 = input.int(100, title = CUSTOM+"3", group = GROUP1, inline = "c3", display = display.data_window) 
+in_color_c3 = input.color(COLOR3, title = "", inline = "c3", group = GROUP1)
+in_show_c3 = input.bool(defval = true, title = "", inline = "c3", group = GROUP1) 
+in_len_c4 = input.int(200, title = CUSTOM+"4", group = GROUP1, inline = "c4", display = display.data_window) 
+in_color_c4 = input.color(COLOR4, title = "", inline = "c4", group = GROUP1)
+in_show_c4 = input.bool(defval = true, title = "", inline = "c4", group = GROUP1) 
+//GROUP2 - Day and Week TF
+in_show_all_day = input.bool(defval = true, title = "Show Day MA                   ", inline = "c0", group = GROUP2) 
+in_show_all_week = input.bool(defval = true, title = "Show Week MA", inline = "c0", group = GROUP2) 
+//GROUP2 Left - DAY
+in_show_d1 = input.bool(defval = true, title = "", inline = "c1", group = GROUP2) 
+in_color_d1 = input.color(COLOR1, title = "", inline = "c1", group = GROUP2)
+in_len_d1 = input.int(20, title = DAY+"1", group = GROUP2, inline = "c1", display = display.data_window) 
+in_show_d2 = input.bool(defval = true, title = "", inline = "c2", group = GROUP2) 
+in_color_d2 = input.color(COLOR2, title = "", inline = "c2", group = GROUP2)
+in_len_d2 = input.int(50, title = DAY+"2", group = GROUP2, inline = "c2", display = display.data_window) 
+in_show_d3 = input.bool(defval = true, title = "", inline = "c3", group = GROUP2) 
+in_color_d3 = input.color(COLOR3, title = "", inline = "c3", group = GROUP2)
+in_len_d3 = input.int(100, title = DAY+"3", group = GROUP2, inline = "c3", display = display.data_window) 
+in_show_d4 = input.bool(defval = true, title = "", inline = "c4", group = GROUP2) 
+in_color_d4 = input.color(COLOR4, title = "", inline = "c4", group = GROUP2)
+day4 = input.int(200, title = DAY+"4", group = GROUP2, inline = "c4", display = display.data_window) 
+//GROUP2 Right - WEEK
+in_len_w1 = input.int(20, title = WEEK+"1", group = GROUP2, inline = "c1", display = display.data_window) 
+in_color_w1 = input.color(COLOR1, title = "", inline = "c1", group = GROUP2)
+in_show_w1 = input.bool(defval = true, title = "", inline = "c1", group = GROUP2) 
+in_len_w2 = input.int(50, title = WEEK+"2", group = GROUP2, inline = "c2", display = display.data_window) 
+in_color_w2 = input.color(COLOR2, title = "", inline = "c2", group = GROUP2)
+in_show_w2 = input.bool(defval = true, title = "", inline = "c2", group = GROUP2) 
+in_len_w3 = input.int(100, title = WEEK+"3", group = GROUP2, inline = "c3", display = display.data_window) 
+in_color_w3 = input.color(COLOR3, title = "", inline = "c3", group = GROUP2)
+in_show_w3 = input.bool(defval = true, title = "", inline = "c3", group = GROUP2) 
+in_len_w4 = input.int(200, title = WEEK+"4", group = GROUP2, inline = "c4", display = display.data_window) 
+in_color_w4 = input.color(COLOR4, title = "", inline = "c4", group = GROUP2)
+in_show_w4 = input.bool(defval = true, title = "", inline = "c4", group = GROUP2) 
+
+// MA labels
+var labels = map.new<string, label>()
+
+// Get source
+get_source(_tf, _func) =>
+    request.security(syminfo.tickerid, _tf, _func, barmerge.gaps_off, barmerge.lookahead_on)
+
+//Charts range
+max = vc.high()
+min = vc.low()
+diff = max - min
+checkRange(value) =>
+    //return True if in range or range check is disabled
+    result = true
+    if hideIfOutOfRange
+        result := (value < max + diff*range_perc/100) and (value > min - diff*range_perc/100)
+    result
+
+checkTF(tf) =>
+    //returns False if chart TF is less than input tf
+    timeframe.in_seconds(tf) >= timeframe.in_seconds(timeframe.period)
+
+// MA type
+ma(_length, _type) =>
+    switch _type
+        "SMA" => ta.sma(src, _length)
+        "EMA" => ta.ema(src, _length)
+        "SMMA (RMA)" => ta.rma(src, _length)
+        "WMA" => ta.wma(src, _length)
+        "VWMA" => ta.vwma(src, _length)
+
+ma_w_label(_length, _timeframe, _color) =>
+    _f = ma(_length, ma_type)
+    _title = "MA"+str.tostring(_length)+"-"+_timeframe
+    _ma = get_source(_timeframe, _f)
+    if bar_index == 0
+        var _l = label.new (bar_index, na, text = _title, textcolor = _color, style=LABEL_STYLE)
+        map.put(labels, _title, _l)
+    if barstate.isconfirmed
+        label.set_xy(labels.get(_title), bar_index+10, checkRange(_ma) ? _ma : na)
+    _ma
+
+
+
+//      PLOTTING
+// Current MA
+// do not plot Current TF MA on Day TF if daily MA specified
+var bool hideCurrentOnDay = timeframe.isdaily and in_show_all_day
+var bool hideCurrentOnWeek = timeframe.isweekly and in_show_all_week
+var bool hideCurrentOnCustom = (timeframe.period == customTF) and in_show_all_cust
+var showCurr = in_show_all_native and not hideCurrentOnDay and not hideCurrentOnWeek and not hideCurrentOnCustom
+
+ma_n1 = showCurr and in_show_n1 ? ma_w_label(in_len_n1, timeframe.period, in_color_n1) : na
+plot(checkRange(ma_n1) ? ma_n1 : na, color=in_color_n1, linewidth = CURRENT_LINE_WIDTH, title="ma_n1", style = PLOT_STYLE)
+ma_n2 = showCurr and in_show_n2 ? ma_w_label(in_len_n2, timeframe.period, in_color_n2) : na
+plot(checkRange(ma_n2) ? ma_n2 : na, color=in_color_n2, linewidth = CURRENT_LINE_WIDTH, title="ma_n2", style = PLOT_STYLE)
+ma_n3 = showCurr and in_show_n3 ? ma_w_label(in_len_n3, timeframe.period, in_color_n3) : na
+plot(checkRange(ma_n3) ? ma_n3 : na, color=in_color_n3, linewidth = CURRENT_LINE_WIDTH, title="ma_n3", style = PLOT_STYLE)
+ma_n4 = showCurr and in_show_n4 ? ma_w_label(in_len_n4, timeframe.period, in_color_n4) : na
+plot(checkRange(ma_n4) ? ma_n4 : na, color=in_color_n4, linewidth = CURRENT_LINE_WIDTH, title="ma_n4", style = PLOT_STYLE)
+
+
+// Custom MA
+var showCustom = in_show_all_cust and checkTF(customTF)
+ma_c1 = showCustom and in_show_c1 ? ma_w_label(in_len_c1, customTF, in_color_c1) : na
+plot(checkRange(ma_c1) ? ma_c1 : na, color=in_color_c1, linewidth = CUSTOM_LINE_WIDTH, title="ma_c1", style = PLOT_STYLE)
+ma_c2 = showCustom and in_show_c2 ? ma_w_label(in_len_c2, customTF, in_color_c2) : na
+plot(checkRange(ma_c2) ? ma_c2 : na, color=in_color_c2, linewidth = CUSTOM_LINE_WIDTH, title="ma_c2", style = PLOT_STYLE)
+ma_c3 = showCustom and in_show_c3 ? ma_w_label(in_len_c3, customTF, in_color_c3) : na
+plot(checkRange(ma_c3) ? ma_c3 : na, color=in_color_c3, linewidth = CUSTOM_LINE_WIDTH, title="ma_c3", style = PLOT_STYLE)
+ma_c4 = showCustom and in_show_c4 ? ma_w_label(in_len_c4, customTF, in_color_c4) : na
+plot(checkRange(ma_c4) ? ma_c4 : na, color=in_color_c4, linewidth = CUSTOM_LINE_WIDTH, title="ma_c4", style = PLOT_STYLE)
+
+//Day MA
+var showDay = in_show_all_day and checkTF("1D")
+ma_d1 = showDay and in_show_d1 ? ma_w_label(in_len_d1, "D", in_color_d1) : na
+plot(checkRange(ma_d1) ? ma_d1 : na, color=in_color_d1, linewidth = DAY_LINE_WIDTH, title="ma_d1", style = PLOT_STYLE)
+ma_d2 = showDay and in_show_d2 ? ma_w_label(in_len_d2, "D", in_color_d2) : na
+plot(checkRange(ma_d2) ? ma_d2 : na, color=in_color_d2, linewidth = DAY_LINE_WIDTH, title="ma_d2", style = PLOT_STYLE)
+ma_d3 = showDay and in_show_d3 ? ma_w_label(in_len_d3, "D", in_color_d3) : na
+plot(checkRange(ma_d3) ? ma_d3 : na, color=in_color_d3, linewidth = DAY_LINE_WIDTH, title="ma_d3", style = PLOT_STYLE)
+ma_d4 = showDay and in_show_d4 ? ma_w_label(day4, "D", in_color_d4) : na
+plot(checkRange(ma_d4) ? ma_d4 : na, color=in_color_d4, linewidth = DAY_LINE_WIDTH, title="ma_d4", style = PLOT_STYLE)
+
+
+//Week MA
+var showWeek = in_show_all_week and checkTF("1W")
+ma_w1 = showWeek and in_show_w1 ? ma_w_label(in_len_w1, "W", in_color_w1) : na
+plot(checkRange(ma_w1) ? ma_w1 : na, color=in_color_w1, linewidth = WEEK_LINE_WIDTH, title="ma_w1", style = PLOT_STYLE)
+ma_w2 = showWeek and in_show_w2 ? ma_w_label(in_len_w2, "W", in_color_w2) : na
+plot(checkRange(ma_w2) ? ma_w2 : na, color=in_color_w2, linewidth = WEEK_LINE_WIDTH, title="ma_w2", style = PLOT_STYLE)
+ma_w3 = showWeek and in_show_w3 ? ma_w_label(in_len_w3, "W", in_color_w3) : na
+plot(checkRange(ma_w3) ? ma_w3 : na, color=in_color_w3, linewidth = WEEK_LINE_WIDTH, title="ma_w3", style = PLOT_STYLE)
+ma_w4 = showWeek and in_show_w4 ? ma_w_label(in_len_w4, "W", in_color_w4) : na
+plot(checkRange(ma_w4) ? ma_w4 : na, color=in_color_w4, linewidth = WEEK_LINE_WIDTH, title="ma_w4", style = PLOT_STYLE)

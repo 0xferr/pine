@@ -1,0 +1,40 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Siarhei Keulich @ferradura
+//@version=5
+indicator("Heiken Ashi EMA", "Heiken Ashi", overlay=true)
+fastPeriod = input.int(defval = 50, step = 1, title = "Fast EMA", group = "EMA")
+slowPeriod = input.int(defval = 200, step = 1, title = "Slow EMA", group = "EMA")
+
+//Heiken Ashi
+haTicker = ticker.heikinashi(syminfo.tickerid)
+
+
+haClose = request.security(haTicker, timeframe.period, close)
+haOpen = request.security(haTicker, timeframe.period, open)
+haHigh = request.security(haTicker, timeframe.period, high)
+haLow = request.security(haTicker, timeframe.period, low)
+
+emaFast = ta.ema(close, fastPeriod)
+emaSlow = ta.ema(close, slowPeriod)
+crossOver = ta.crossover(emaFast, emaSlow)
+crossUnder = ta.crossunder(emaFast, emaSlow)
+
+plot(emaSlow, color = color.black)
+plot(emaFast, color = color.yellow)
+
+noBottomWick = haOpen == haLow
+noTopWick = haOpen == haHigh
+longRule = noBottomWick and crossOver
+shortRule = noTopWick and crossUnder
+
+
+bgcolor(color = longRule ? color.rgb(232, 232, 229) : na)
+bgcolor(color = shortRule ?  color.rgb(232, 232, 229) : na)
+
+longSig = longRule ? close : na
+shortSig = shortRule ? close : na
+
+
+plotshape(longSig, title = "Long", style = shape.triangleup, location = location.abovebar, color = color.green, size = size.normal)
+plotshape(shortSig, title = "Short", style = shape.triangledown, location = location.belowbar, color = color.red, size = size.normal)
+

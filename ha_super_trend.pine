@@ -1,0 +1,52 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Siarhei Keulich @ferradura
+
+//@version=5
+indicator("HA ST", overlay = true)
+
+supertrendAtrPeriod = input.int(defval = 10, step = 1, title = "ATR Length", group = "Supertrend")
+supertrendAtrMultiplier = input.float(defval = 2.7, step = 0.1, title = "ATR Multiplier", group = "Supertrend")
+
+// HA
+haTicker = ticker.heikinashi(syminfo.tickerid)
+haClose = request.security(haTicker, timeframe.period, close)
+haOpen = request.security(haTicker, timeframe.period, open)
+haHigh = request.security(haTicker, timeframe.period, high)
+haLow = request.security(haTicker, timeframe.period, low)
+
+//  HA Supertrend
+haTrueRange = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, ta.atr(supertrendAtrPeriod))
+haSupertrendUp = ((haHigh + haLow) / 2) - (supertrendAtrMultiplier * haTrueRange)
+haSupertrendDown = ((haHigh + haLow) / 2) + (supertrendAtrMultiplier * haTrueRange)
+
+float trendingUp = na
+float trendingDown = na
+direction = 0
+
+trendingUp := haClose[1] > trendingUp[1] ? math.max(haSupertrendUp,trendingUp[1]) : haSupertrendUp
+trendingDown := haClose[1] < trendingDown[1] ? math.min(haSupertrendDown,trendingDown[1]) : haSupertrendDown
+direction := haClose > trendingDown[1] ? 1: haClose < trendingUp[1]? -1: nz(direction[1],1)
+
+
+// Creating signals
+STsignalUp = ta.change(direction) > 0
+STsignalDown = ta.change(direction) < 0
+noBottomWick = haOpen == haLow
+noTopWick = haOpen == haHigh
+
+longRule = noBottomWick and STsignalUp
+shortRule = noTopWick and STsignalDown
+longSig = longRule ? close : na
+shortSig = shortRule ? close : na
+
+//  Plot Supertrend
+bodyMiddle = plot((haOpen + haClose) / 2, display=display.none)
+downTrend = plot(direction < 0 ? trendingDown : na, "Down Trend", color = color.red, style=plot.style_linebr)
+upTrend = plot(direction < 0 ? na : trendingUp, "Up Trend", color = color.green, style=plot.style_linebr)
+fill(bodyMiddle, upTrend, color =  color.rgb(76, 175, 79, 80), fillgaps=false)
+fill(bodyMiddle, downTrend, color = color.rgb(255, 82, 82, 80), fillgaps=false)
+
+// Plot signal 
+plotshape(longSig, title = "Long", style = shape.triangleup, location = location.abovebar, color = color.green, size = size.normal)
+plotshape(shortSig, title = "Short", style = shape.triangledown, location = location.belowbar, color = color.red, size = size.normal)
+

@@ -1,0 +1,134 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Siarhei Keulich @ferradura
+
+//@version=5
+indicator("Visible Range Volume profile", "Volume Profile", overlay = true, max_bars_back = 5000, max_boxes_count = 500)
+import PineCoders/VisibleChart/4 as vc
+
+// input
+var GP2 = "Table"
+var GP1 = "Volume Profile"
+number = input.int(50, "Rows", tooltip = "Number or row in Profile", group = GP1, display = display.none)
+PERCENT_WIDTH = input.int(30, "Width in %", step=5, group = GP1, inline = "01")
+hist_colour = input.color(color.new(color.blue, 90), group = GP1, inline = "01")
+show_table = input.bool(false, "Show Table", "table contains volume of each profile row", group = GP2)
+tableYposInput = input.string("top", "Panel position", inline = "11", options = ["top", "middle", "bottom"], group = GP2, display = display.none)
+tableXposInput = input.string("right", "", inline = "11", options = ["left", "center", "right"], group = GP2, display = display.none)
+
+// arrays
+hist_values = array.new<float>(number, 0.0)
+var boxes = array.new<box>(number, na)
+
+// fist time box creation
+create_boxes() =>
+    for k = 0 to number-1
+        _box = box.new(left=bar_index, top=1, right=bar_index+1, bottom=0, bgcolor=hist_colour, border_color=hist_colour)
+        array.set(boxes, k, _box)
+
+// add volume to profile
+add_volume(_vol, _ndx) =>
+    _x = array.get(hist_values, _ndx)
+    array.set(hist_values, _ndx, _x + _vol)
+    log.info("Adding " + str.tostring(_vol) + " to ndx " + str.tostring(_ndx))
+
+// float strings to numbers
+to_str(_float) =>
+    if _float > 100000000
+        _s = str.format("{0, number, integer}M", _float/1000000)
+    else if _float > 10000000
+        _s = str.format("{0, number, #.#}M", _float/1000000)
+    else if _float > 1000000
+        _s = str.format("{0, number, #.##}M", _float/1000000)
+    else if _float > 100000
+        _s = str.format("{0, number, integer}K", _float/1000)
+    else if _float > 10000
+        _s = str.format("{0, number, #.#}K", _float/1000)
+    else if _float > 1000
+        _s = str.format("{0, number, #.##}K", _float/1000)
+    else
+        _s = str.tostring(int(_float))
+
+
+
+
+// Visible chart values
+int bars_qty = vc.bars()
+int last_bar = vc.rightBarIndex()
+int first_bar = vc.leftBarIndex()
+float min = vc.low()
+float max = vc.high()
+float step = (max - min)/number
+
+if bar_index == first_bar
+    create_boxes()
+
+
+if barstate.islast
+    // vars
+    b_low = 0.0
+    b_high = 0.0
+    b_vol = 0.0
+    start_ndx = 0
+    end_ndx = 0
+    edge = 0.0
+    // filling array
+    for i = 0 to bars_qty-1
+        b_low := low[bar_index - first_bar - i]
+        b_high := high[bar_index - first_bar - i]
+        b_vol := volume[bar_index - first_bar - i]
+        start_ndx := int((b_low - min) / step)
+        end_ndx := int((b_high - min) / step)
+        //border conditions
+        if b_high == max
+            end_ndx := end_ndx - 1
+        // some urpredicted behaviour
+        if end_ndx == number
+            log.warning("bars range: " + str.tostring(first_bar) + " - " + str.tostring(last_bar))
+            log.warning("bars index: " + str.tostring(bar_index))
+            log.warning("indices=" + str.tostring(start_ndx) + " / " + str.tostring(end_ndx))
+            log.warning("bar l/h: " + str.tostring(b_low) + "/" + str.tostring(b_high))
+            log.warning("min/max: " + str.tostring(min) + "/" + str.tostring(max))
+            continue
+
+        // check if candle is fully inside one histogram line
+        if start_ndx == end_ndx
+            add_volume(b_vol, start_ndx)
+            continue
+
+        // calculating bottom part of candle
+        edge := (start_ndx + 1) * step + min    // upper adge of first histogram
+        add_volume(b_vol * (edge - b_low) / (b_high-b_low), start_ndx)
+
+        // calculating top part of candles
+        edge := end_ndx * step + min    // lower edge of last histogram
+        add_volume(b_vol * (b_high - edge) / (b_high-b_low), end_ndx)
+
+        // calculating middle parts
+        if end_ndx - start_ndx >= 2
+            for j = start_ndx + 1 to end_ndx - 1
+                add_volume(b_vol * step / (b_high-b_low), j)
+
+    // Draw boxes
+    max_vol = array.max(hist_values)
+    hist_width = int(bars_qty * PERCENT_WIDTH /100 )
+    for k=0 to number-1
+        cell = array.get(hist_values, k)
+        _box = array.get(boxes, k)
+        normalized_vol = cell / max_vol
+        box.set_left(_box, first_bar)
+        box.set_right(_box, int(first_bar + hist_width * normalized_vol))
+        box.set_bottom(_box, min + step * k)
+        box.set_top(_box, min + step * (k+1))
+
+// Draw table
+if barstate.islast and show_table
+    var table panel = table.new(tableYposInput + "_" + tableXposInput, 2, number + 2)
+    table.cell(panel, 0, 0, "Price", bgcolor = color.new(color.gray, 80))
+    table.cell(panel, 1, 0, "Volume", bgcolor = color.new(color.gray, 80))
+    for k = 0 to number-1
+        _ndx = number-1 - k
+        cell = array.get(hist_values, _ndx)
+        _price = min + (_ndx+0.5) * step
+        table.cell(panel, 0, k+1, to_str(_price))
+        table.cell(panel, 1, k+1, to_str(cell))
+
