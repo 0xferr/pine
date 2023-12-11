@@ -8,8 +8,8 @@ import PineCoders/VisibleChart/4 as vc
 // input
 var GP2 = "Table"
 var GP1 = "Volume Profile"
-number = input.int(50, "Rows", tooltip = "Number or row in Profile", group = GP1, display = display.none)
-PERCENT_WIDTH = input.int(30, "Width in %", step=5, group = GP1, inline = "01")
+number = input.int(50, "Rows", tooltip = "Number or row in Profile", group = GP1)
+PERCENT_WIDTH = input.int(30, "Width in %", step=5, group = GP1, inline = "01", display = display.none)
 hist_colour = input.color(color.new(color.blue, 90), group = GP1, inline = "01")
 show_table = input.bool(false, "Show Table", "table contains volume of each profile row", group = GP2)
 tableYposInput = input.string("top", "Panel position", inline = "11", options = ["top", "middle", "bottom"], group = GP2, display = display.none)
@@ -32,7 +32,7 @@ add_volume(_vol, _ndx) =>
     log.info("Adding " + str.tostring(_vol) + " to ndx " + str.tostring(_ndx))
 
 // float strings to numbers
-to_str(_float) =>
+vol_to_str(_float) =>
     if _float > 100000000
         _s = str.format("{0, number, integer}M", _float/1000000)
     else if _float > 10000000
@@ -47,6 +47,28 @@ to_str(_float) =>
         _s = str.format("{0, number, #.##}K", _float/1000)
     else
         _s = str.tostring(int(_float))
+price_to_str(_float) =>
+    if _float > 100000000
+        _s = str.format("{0, number, #.#}M", _float/1000000)
+    else if _float > 10000000
+        _s = str.format("{0, number, #.##}M", _float/1000000)
+    else if _float > 1000000
+        _s = str.format("{0, number, #.###}M", _float/1000000)
+    else if _float > 100000
+        _s = str.format("{0, number, #.#}K", _float/1000)
+    else if _float > 10000
+        _s = str.format("{0, number, #.##}K", _float/1000)
+    else if _float > 1000
+        _s = str.format("{0, number, #.###}K", _float/1000)
+    else if _float > 100
+        _s = str.format("{0, number, #.#}", _float)
+    else if _float > 10
+        _s = str.format("{0, number, #.##}", _float)
+    else if _float > 1
+        _s = str.format("{0, number, #.###}", _float)
+    else
+        _s = str.tostring(_float)
+
 
 
 
@@ -129,6 +151,6 @@ if barstate.islast and show_table
         _ndx = number-1 - k
         cell = array.get(hist_values, _ndx)
         _price = min + (_ndx+0.5) * step
-        table.cell(panel, 0, k+1, to_str(_price))
-        table.cell(panel, 1, k+1, to_str(cell))
+        table.cell(panel, 0, k+1, price_to_str(_price))
+        table.cell(panel, 1, k+1, vol_to_str(cell))
 
