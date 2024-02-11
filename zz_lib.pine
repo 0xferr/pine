@@ -1,0 +1,69 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Siarhei Keulich @ferradura
+
+//@version=5
+library("ZZ", overlay = true)
+
+export type Pivot
+    bool        isUp 
+    chart.point start
+    chart.point end
+
+export type ZigZag
+    float        max_dev
+    array<Pivot> pivots
+    
+export init(float max_dev_perc) =>
+    max_dev = max_dev_perc/100
+    ZigZag res = ZigZag.new(max_dev, array.new<Pivot>())
+    end = chart.point.new(time, bar_index, high)
+    start = chart.point.new(time, bar_index, open)
+    piv = Pivot.new(true, start, end)
+    array.push(res.pivots, piv)
+    res
+
+export method get_pivot(series ZigZag this, int offset=0)=>
+    ndx = this.pivots.size() - 1 - offset
+    array.get(this.pivots, ndx)
+
+export method get_piv_price(series ZigZag this, int offset=0) =>
+    piv = this.get_pivot(offset)
+    piv.end.price
+    
+method add_pivot(series ZigZag this, float price, bool isUp) =>
+    end = chart.point.new(time, bar_index, price)
+    start = this.get_pivot().end
+    new_piv = Pivot.new(isUp, start, end)
+    array.push(this.pivots, new_piv)
+
+method update_pivot(series ZigZag this, float price, int offset=0) =>             //!!! ???
+    ndx = this.pivots.size() - 1 - offset
+    point = chart.point.new(time, bar_index, price)
+    piv = this.pivots.get(ndx)
+    piv.end := point
+    this.pivots.set(ndx, piv)
+
+export method find_pivot(series ZigZag this) =>
+    piv = this.get_pivot(0)
+    if piv.isUp
+        if high > piv.end.price
+            this.update_pivot(high)
+        else if (piv.end.price - low)/low > this.max_dev
+            this.add_pivot(low, false)
+    else 
+        if low < piv.end.price
+            this.update_pivot(low)
+        else if (high - piv.end.price)/ piv.end.price > this.max_dev
+            this.add_pivot(high, true)
+
+
+var zz = init(0.5)
+
+zz.find_pivot()
+zz_price = zz.get_piv_price()
+
+
+plot(ta.change(zz_price) != 0 ? zz_price : na)
+
+// bgcolor(color = trendIsUp ? color.rgb(221, 245, 221) : na)
+// bgcolor(color = not trendIsUp ?  color.rgb(255, 226, 226) : na)

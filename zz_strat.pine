@@ -1,0 +1,84 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ferradura
+//@version=5
+strategy("zz strategy v0", overlay = true, initial_capital = 100000, default_qty_type = strategy.percent_of_equity, default_qty_value = 100, commission_type = strategy.commission.percent, commission_value = 0.001)
+import ferradura/ZZ/1 as ZZ
+import paragjyoti2012/LoggerLib/5 as Logger
+
+// Input
+dev = input.float(0.5, "Deviation (%)", minval = 0.00001, maxval = 100.0),
+// logger
+offset=input.int(0,"Offset",minval=0)
+font_size=input.string("small","Font Size",options=["normal","small","large"])
+rows=input.int(15,"No Of Rows")
+position=input.string("right","Position",options=["left","right","top-right"])
+hide_date=input.bool(false,"Hide Time")
+var logger=Logger.init()
+var logTable=Logger.initTable(logger, rows, offset, position, font_size, hide_date)
+
+// initiation
+var zz = ZZ.init(dev)
+zz.find_pivot()
+
+// vars
+var bool last_is_high = na
+bool longRule = na
+float stoploss = na
+
+size = zz.pivots.size()
+plot(size > 0 ? zz.get_piv_price() : na)
+
+get_high(shift) =>
+    _corr = last_is_high ? 1 : 0
+    _p = array.get(zz.pivots, size - shift*2 + _corr)
+    _p.end.price
+get_low(shift) =>
+    _corr = last_is_high ? 0 : 1
+    _p = array.get(zz.pivots, size - shift*2 + _corr)
+    _p.end.price
+get_highest_pivot(deep) =>
+    var float _d = 0.0
+    for i=0 to deep*2 by 2
+        _p = array.get(zz.pivots, size - 1 - i)
+        _m = math.max(_p.start.price, _p.end.price)
+        _d := _m > _d ? _m : _d
+    _d
+
+lowest = ta.lowest(low, 4)
+if size > 11
+    last_is_high := zz.get_pivot().isUp
+    if not last_is_high and strategy.position_size == 0.0
+        // longRule := get_low(1) > get_low(2) and get_high(1) > get_high(2) and lowest > get_low(2) and get_high(3) > get_high(2) and get_high(3) > get_high(1)
+        longRule := get_low(1) > get_low(2) and get_low(2) > get_low(3)  and get_high(1) > get_high(2) and get_highest_pivot(5) > get_high(1)  and lowest > get_low(2)
+
+
+    // to try this:
+    // if last_is_high and strategy.position_size == 0.0
+    //     longRule := get_low(1) > get_low(2) and get_high(1) > get_high(2)
+
+
+
+bgcolor(color = longRule ? color.rgb(229, 250, 217) : na)
+longSig = longRule ? close : na
+plotshape(longSig, title = "Long", style = shape.triangleup, location = location.abovebar, color = color.green, size = size.normal)
+
+if longRule and strategy.position_size == 0.0
+    if get_low(2) < close
+        stoploss := get_low(2)
+        strategy.entry("buy", strategy.long)
+        strategy.exit("stop", stop = stoploss)
+
+if strategy.position_size > 0.0
+    stoploss := get_low(2)
+    strategy.exit("stop", stop = stoploss)
+
+plot(stoploss, "Stop", color = color.red, style = plot.style_linebr)
+// if barstate.islast
+//     p1 = zz.pivots.get(-1).end.price
+//     p0 = str.tostring(pp[1])
+//     Logger.log(p0,logger,logTable,"warning")
+//     Logger.log(str.tostring(p1),logger,logTable,"warning")
+
+
+
+
